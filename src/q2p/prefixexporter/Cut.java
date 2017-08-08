@@ -3,6 +3,10 @@ package q2p.prefixexporter;
 final class Cut {
 	private int priority;
 	private String extension;
+	final String getExtension() {
+		return extension;
+	}
+	
 	final int position;
 	
 	Cut(final int priority, final String extension, final int position) {
@@ -16,9 +20,5 @@ final class Cut {
 			this.priority = priority;
 			this.extension = extension;
 		}
-	}
-	
-	final String getExtension() {
-		return extension;
 	}
 }

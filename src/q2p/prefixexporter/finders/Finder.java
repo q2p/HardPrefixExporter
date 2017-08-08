@@ -14,6 +14,7 @@ public abstract class Finder implements Runnable {
 	}
 	
 	public abstract void setBuff(final ByteBuffer byteBuffer);
+	
 	final void push(final int position){
 		HardPrefixExporter.push(priority, extension, position);
 	}

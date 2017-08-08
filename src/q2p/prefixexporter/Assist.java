@@ -2,7 +2,6 @@ package q2p.prefixexporter;
 
 import java.io.Closeable;
 import java.nio.ByteBuffer;
-import java.util.Arrays;
 
 public final class Assist {
 	public static boolean nextExact(final ByteBuffer buffer, final int ... bytes) {
@@ -21,7 +20,6 @@ public final class Assist {
 		}
 		return true;
 	}
-	
 	public static boolean skip(final ByteBuffer buffer, final int bytes) {
 		if(buffer.remaining() < bytes)
 			return false;
@@ -57,7 +55,7 @@ public final class Assist {
 		} catch(Throwable ignore) {}
 	}
 	
-	private static final String compactSyms = "0123456789abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ";
+	private static final String compactSyms = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
 	public static String compact(long binary, final int prefix) {
 		assert binary >= 0;
 		

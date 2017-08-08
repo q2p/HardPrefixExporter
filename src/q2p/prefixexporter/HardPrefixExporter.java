@@ -16,9 +16,8 @@ import java.util.LinkedList;
 import java.util.ListIterator;
 
 public final class HardPrefixExporter {
-	private static byte[] buffer = null;
-	
-	private static final LinkedList<Cut> cuts = new LinkedList<>();
+	private static final int markEveryFound = 5000;
+	private static final int markEveryWrite = 50;
 	
 	private static final Finder[] finders = {
 		new PureJfifFinder(0, "jfif", 0xE0, 0x4A, 0x46, 0x49, 0x46, 0x00), // E0 JFIF
@@ -33,7 +32,35 @@ public final class HardPrefixExporter {
 		new ExactFinder(0, "png", 0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A)
 	};
 	
+	private static int rememberFor;
+	
+	private static byte[] buffer = null;
+	
+	private static final LinkedList<Cut> cuts = new LinkedList<>();
+	
 	public static void main(final String[] args) {
+		if(args.length == 0) {
+			printGuide();
+			return;
+		}
+		if(args.length > 1) {
+			System.out.println("Слишком много аргументов.");
+			printGuide();
+			return;
+		}
+		try {
+			rememberFor = Integer.parseInt(args[0]);
+		} catch(final NumberFormatException e) {
+			System.out.println("Аргумент не является числом.");
+			printGuide();
+			return;
+		}
+		if(rememberFor < 0) {
+			System.out.println("Аргумент не может быть меньше 0.");
+			printGuide();
+			return;
+		}
+		
 		if(!fill())
 			return;
 		
@@ -42,91 +69,13 @@ public final class HardPrefixExporter {
 		cutFiles();
 	}
 	
-	private static void cutFiles() {
-		if(cuts.isEmpty()) {
-			System.out.println("Не было найдено ни одного файла.");
-			return;
-		}
-		
-		final File dir = new File("out");
-		if(dir.isFile()) {
-			System.out.println("Файл \"out\" должен являться дирректорией.");
-			return;
-		}
-		dir.mkdirs();
-		
-		final ByteBuffer wrapper = ByteBuffer.wrap(buffer);
-		
-		final ListIterator<Cut> iterator = cuts.listIterator();
-		
-		final int nameLength = Assist.compact(cuts.size(), 0).length();
-		
-		Cut cut = iterator.next();
-		for(int id = 0; cut != null; id++) {
-			wrapper.position(cut.position);
-			final String extension = cut.getExtension();
-			if(iterator.hasNext()) {
-				cut = iterator.next();
-				wrapper.limit(cut.position);
-			} else {
-				cut = null;
-				wrapper.limit(buffer.length);
-			}
-			
-			 if(!cutFile(Assist.compact(id, nameLength)+'.'+extension, wrapper))
-				return;
-		}
-		
-		System.out.println("Запись файлов успешно завершена.");
-	}
-	
-	private static boolean cutFile(final String name, final ByteBuffer buffer) {
-		final FileChannel fc;
-		try {
-			fc = FileChannel.open(Paths.get("out", name), StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
-		} catch(final IOException e) {
-			return failedWrite(name, e);
-		}
-		final FileLock lock;
-		try {
-			lock = fc.lock();
-		} catch(final IOException e) {
-			Assist.safeClose(fc);
-			return failedWrite(name, e);
-		}
-		try {
-			while(buffer.hasRemaining())
-				fc.write(buffer);
-			
-			return true;
-		} catch(final IOException e) {
-			return failedWrite(name, e);
-		} finally {
-			try {
-				lock.release();
-			} catch(final IOException ignore) {}
-			Assist.safeClose(fc);
-		}
-	}
-	
-	private static boolean failedWrite(final String name, final Throwable e) {
-		System.out.println("Не удалось записать в файл \"out/"+name+"\".");
-		System.out.println(e.getMessage());
-		return false;
-	}
-	
-	private static void startThreads() {
-		final Thread[] threads = new Thread[finders.length];
-		for(int i = threads.length-1; i != -1; i--) {
-			finders[i].setBuff(ByteBuffer.wrap(buffer).asReadOnlyBuffer());
-			threads[i] = new Thread(finders[i]);
-			threads[i].start();
-		}
-		for(final Thread thread : threads) {
-			try {
-				thread.join();
-			} catch(final InterruptedException ignore) {}
-		}
+	private static void printGuide() {
+		System.out.println("Для использования введите количество частей, которые надо объеденить.\n" +
+			"1 - Каждая часть сама по себе.\n" +
+			"2 - Каждая часть состоит из самой себя и следующей за ней.\n" +
+			"3 - Каждая часть состоит из самой себя и двумя следующими за ней.\n" +
+			"0 - Каждая часть продолжается до конца файла."
+		);
 	}
 	
 	private static boolean fill() {
@@ -165,11 +114,26 @@ public final class HardPrefixExporter {
 		}
 	}
 	
+	private static void startThreads() {
+		final Thread[] threads = new Thread[finders.length];
+		for(int i = threads.length-1; i != -1; i--) {
+			finders[i].setBuff(ByteBuffer.wrap(buffer).asReadOnlyBuffer());
+			threads[i] = new Thread(finders[i]);
+			threads[i].start();
+		}
+		for(final Thread thread : threads) {
+			try {
+				thread.join();
+			} catch(final InterruptedException ignore) {}
+		}
+		System.out.println("Всего было найдено "+cuts.size()+" файлов.");
+	}
+	
 	public static synchronized void push(final int priority, final String extension, final int position) {
 		assert position >= 0 && position <= buffer.length;
 		
-		if(position == 1_992_919)
-			System.out.println(position);
+		if(position == buffer.length)
+			return;
 		
 		final ListIterator<Cut> iterator = cuts.listIterator();
 		
@@ -181,10 +145,109 @@ public final class HardPrefixExporter {
 			}
 			if(cut.position > position) {
 				iterator.previous();
-				iterator.add(new Cut(priority, extension, position));
+				put(iterator, priority, extension, position);
 				return;
 			}
 		}
+		put(iterator, priority, extension, position);
+	}
+	
+	private static void put(final ListIterator<Cut> iterator, final int priority, final String extension, final int position) {
 		iterator.add(new Cut(priority, extension, position));
+		if(!cuts.isEmpty() && cuts.size() % markEveryFound == 0)
+			System.out.println("Нашёл "+cuts.size()+" файлов.");
+	}
+	
+	private static void cutFiles() {
+		if(cuts.isEmpty()) {
+			System.out.println("Не было найдено ни одного файла.");
+			return;
+		}
+		
+		final Part[] parts = getParts();
+		
+		final File dir = new File("out");
+		if(dir.isFile()) {
+			System.out.println("Файл \"out\" должен являться дирректорией.");
+			return;
+		}
+		dir.mkdirs();
+		
+		final ByteBuffer wrapper = ByteBuffer.wrap(buffer);
+		
+		final int nameLength = Assist.compact(parts.length, 0).length();
+		
+		for(int i = 0; i != parts.length; i++) {
+			wrapper.position(parts[i].start);
+			
+			if(rememberFor == 0)
+				wrapper.limit(buffer.length);
+			else
+				wrapper.limit(parts[i+Math.min(rememberFor, parts.length-i)-1].end);
+			
+			if((i+1) % markEveryWrite == 0)
+				System.out.println("Записываю файл №"+(i+1));
+			
+			if(!cutFile(Assist.compact(i, nameLength)+'.'+parts[i].extension, wrapper))
+				return;
+		}
+		
+		System.out.println("Запись файлов успешно завершена.");
+	}
+	
+	private static Part[] getParts() {
+		final Part[] ret = new Part[cuts.size()];
+		
+		Cut cut = cuts.removeFirst();
+		for(int i = 0; cut != null; i++) {
+			final String extension = cut.getExtension();
+			final int start = cut.position;
+			final int end;
+			if(cuts.isEmpty()) {
+				cut = null;
+				end = buffer.length;
+			} else {
+				cut = cuts.removeFirst();
+				end = cut.position;
+			}
+			ret[i] = new Part(extension, start, end);
+		}
+		
+		return ret;
+	}
+	
+	private static boolean cutFile(final String name, final ByteBuffer buffer) {
+		final FileChannel fc;
+		try {
+			fc = FileChannel.open(Paths.get("out", name), StandardOpenOption.WRITE, StandardOpenOption.TRUNCATE_EXISTING, StandardOpenOption.CREATE);
+		} catch(final IOException e) {
+			return failedWrite(name, e);
+		}
+		final FileLock lock;
+		try {
+			lock = fc.lock();
+		} catch(final IOException e) {
+			Assist.safeClose(fc);
+			return failedWrite(name, e);
+		}
+		try {
+			while(buffer.hasRemaining())
+				fc.write(buffer);
+			
+			return true;
+		} catch(final IOException e) {
+			return failedWrite(name, e);
+		} finally {
+			try {
+				lock.release();
+			} catch(final IOException ignore) {}
+			Assist.safeClose(fc);
+		}
+	}
+	
+	private static boolean failedWrite(final String name, final Throwable e) {
+		System.out.println("Не удалось записать в файл \"out/"+name+"\".");
+		System.out.println(e.getMessage());
+		return false;
 	}
 }
