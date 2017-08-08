@@ -55,19 +55,16 @@ public final class Assist {
 		} catch(Throwable ignore) {}
 	}
 	
-	private static final String compactSyms = "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789";
-	public static String compact(long binary, final int prefix) {
-		assert binary >= 0;
+	public static String prefix(final String string, final int prefix) {
+		assert string.length() <= prefix;
 		
 		final StringBuilder sb = new StringBuilder();
-		do {
-			sb.append(compactSyms.charAt((int)(binary % compactSyms.length())));
-			binary /= compactSyms.length();
-		} while(binary != 0);
 		
-		while(sb.length() < prefix)
-			sb.append(compactSyms.charAt(0));
+		for(int i = prefix-string.length(); i != 0; i--)
+			sb.append('0');
 		
-		return sb.reverse().toString();
+		sb.append(string);
+		
+		return sb.toString();
 	}
 }

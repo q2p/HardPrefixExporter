@@ -181,7 +181,7 @@ public final class HardPrefixExporter {
 		
 		final ByteBuffer wrapper = ByteBuffer.wrap(buffer);
 		
-		final int nameLength = Assist.compact(parts.length, 0).length();
+		final int nameLength = (""+(parts.length-1)).length();
 		
 		for(int i = 0; i != parts.length; i++) {
 			wrapper.position(parts[i].start);
@@ -194,7 +194,7 @@ public final class HardPrefixExporter {
 			if((i+1) % markEveryWrite == 0)
 				System.out.println("Записываю файл №"+(i+1));
 			
-			if(!cutFile(Assist.compact(i, nameLength)+'.'+parts[i].extension, wrapper))
+			if(!cutFile(Assist.prefix(""+i, nameLength)+'.'+parts[i].extension, wrapper))
 				return;
 		}
 		
