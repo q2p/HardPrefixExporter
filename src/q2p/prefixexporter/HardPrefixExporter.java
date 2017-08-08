@@ -39,27 +39,8 @@ public final class HardPrefixExporter {
 	private static final LinkedList<Cut> cuts = new LinkedList<>();
 	
 	public static void main(final String[] args) {
-		if(args.length == 0) {
-			printGuide();
+		if(!initArgs(args))
 			return;
-		}
-		if(args.length > 1) {
-			System.out.println("Слишком много аргументов.");
-			printGuide();
-			return;
-		}
-		try {
-			rememberFor = Integer.parseInt(args[0]);
-		} catch(final NumberFormatException e) {
-			System.out.println("Аргумент не является числом.");
-			printGuide();
-			return;
-		}
-		if(rememberFor < 0) {
-			System.out.println("Аргумент не может быть меньше 0.");
-			printGuide();
-			return;
-		}
 		
 		if(!fill())
 			return;
@@ -67,6 +48,31 @@ public final class HardPrefixExporter {
 		startThreads();
 		
 		cutFiles();
+	}
+	
+	private static boolean initArgs(final String[] args) {
+		if(args.length == 0) {
+			printGuide();
+			return false;
+		}
+		if(args.length > 1) {
+			System.out.println("Слишком много аргументов.");
+			printGuide();
+			return false;
+		}
+		try {
+			rememberFor = Integer.parseInt(args[0]);
+		} catch(final NumberFormatException e) {
+			System.out.println("Аргумент не является числом.");
+			printGuide();
+			return false;
+		}
+		if(rememberFor < 0) {
+			System.out.println("Аргумент не может быть меньше 0.");
+			printGuide();
+			return false;
+		}
+		return true;
 	}
 	
 	private static void printGuide() {
